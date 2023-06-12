@@ -51,28 +51,33 @@ def sendOispData(n, v):
 
 
 def parse_mqtt_forward(topic, payload):
+    print("Parsing MQTT message")
+    print(topic)
+    print(payload)
     for item in target_configs:
         time.sleep(1)
-        mqtt_topic = item.split("|")[0]
-        mqtt_variable = item.split("|")[1]
-        oisp_n = item.split("|")[2]
+        if topic == str(item.split("|")[0]):
+            mqtt_topic = item.split("|")[0]
+            mqtt_variable = item.split("|")[1]
+            oisp_n = item.split("|")[2]
 
-        if topic == str(mqtt_topic):
-            mqtt_value_json = json.load(payload)
-            mqtt_value = mqtt_value_json[mqtt_variable]
-            mqtt_value = mqtt_value.round(2)
+            if str(oisp_n) == "Property/http://www.industry-fusion.org/fields#status":
+                mqtt_value = 2
 
-        if str(oisp_n) == "Property/http://www.industry-fusion.org/fields#status":
-            mqtt_value = 2
+            elif topic == str(mqtt_topic):
+                mqtt_value_json = json.loads(payload)
+                mqtt_value = mqtt_value_json[mqtt_variable]
+                mqtt_value = round(float(mqtt_value), 2)
         
-        sendOispData(n=oisp_n, v=mqtt_value)
+            sendOispData(n=oisp_n, v=mqtt_value)
 
 
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code "+str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    client.subscribe("$SYS/#")
+    for item in target_configs:
+        client.subscribe(item.split("|")[0])
 
 
 # The callback for when a PUBLISH message is received from the server.
@@ -108,6 +113,6 @@ if __name__ == "__main__":
     client.on_connect = on_connect
     client.on_message = on_message
 
-    client.connect(broker_url, broker_url, 60)
+    client.connect(str(broker_url), int(broker_port), 60)
 
     client.loop_forever()
