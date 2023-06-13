@@ -60,14 +60,16 @@ def parse_mqtt_forward(topic, payload):
             mqtt_topic = item.split("|")[0]
             mqtt_variable = item.split("|")[1]
             oisp_n = item.split("|")[2]
+            mqtt_value_json = json.loads(payload)
 
-            if str(oisp_n) == "Property/http://www.industry-fusion.org/fields#status":
+            if str(oisp_n) == "Property/http://www.industry-fusion.org/fields#status" and int(mqtt_value_json[mqtt_variable]) == 7:
                 mqtt_value = 2
 
-            elif topic == str(mqtt_topic):
-                mqtt_value_json = json.loads(payload)
+            elif str(oisp_n) == "Property/http://www.industry-fusion.org/fields#status":
+                mqtt_value = 1
+            else:
                 mqtt_value = mqtt_value_json[mqtt_variable]
-                mqtt_value = round(float(mqtt_value), 2)
+                mqtt_value = round(float(mqtt_value), 3)
         
             sendOispData(n=oisp_n, v=mqtt_value)
 
