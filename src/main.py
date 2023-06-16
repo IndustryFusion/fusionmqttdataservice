@@ -27,7 +27,7 @@ oisp_agent_socket.connect((str(oisp_url), int(oisp_port)))
 #root = client.get_root_node()
 
 # Opening JSON file
-f = open("../resources/configs.json")
+f = open("../resources/config.json")
 target_configs = json.load(f)
 f.close()
 
@@ -58,9 +58,10 @@ def parse_mqtt_forward(topic, payload):
     print(topic)
     print(payload)
     for item in target_configs['fusionmqttdataservice']['specification']:
-        time.sleep(1)
+        time.sleep(0.5)
         if topic == str(item['topic']):
             if not item['key']:
+                time.sleep(0.5)
                 oisp_n = "Property/http://www.industry-fusion.org/fields#" + item['parameter'][0]
 
                 if str(oisp_n) == "Property/http://www.industry-fusion.org/fields#status":
@@ -69,9 +70,12 @@ def parse_mqtt_forward(topic, payload):
                     mqtt_value = str(payload)
                     mqtt_value = round(float(mqtt_value), 3)
 
+                sendOispData(n=oisp_n, v=mqtt_value)
+
             else:
                 param_count = 0
                 for i in item['key']:
+                    time.sleep(0.5)
                     oisp_n = "Property/http://www.industry-fusion.org/fields#" + item['parameter'][param_count]
                     mqtt_value_json = json.loads(payload)
 
@@ -93,8 +97,8 @@ def on_connect(client, userdata, flags, rc):
     print("Connected with result code "+str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    for item in target_configs:
-        client.subscribe(item.split("|")[0])
+    for item in target_configs['fusionmqttdataservice']['specification']:
+        client.subscribe(item['topic'])
 
 
 # The callback for when a PUBLISH message is received from the server.
@@ -112,6 +116,7 @@ if __name__ == "__main__":
     accounts = oisp_client.get_accounts()
     account = accounts[0]
     devices = account.get_devices()
+    
     for j in range(len(devices)):
         if str(device_id) == str(devices[j].device_id):
             device = devices[j]
@@ -121,11 +126,13 @@ if __name__ == "__main__":
                 time.sleep(2)
                 device.delete_component(components['cid'])
 
+
     for item in target_configs['fusionmqttdataservice']['specification']:
-        oisp_n = "Property/http://www.industry-fusion.org/fields#" + item['parameter']
-        oisp_t = "property.v1.0"
-        registerComponent(oisp_n, oisp_t)
-        time.sleep(10)
+        for j in item['parameter']:
+            oisp_n = "Property/http://www.industry-fusion.org/fields#" + j
+            oisp_t = "property.v1.0"
+            registerComponent(oisp_n, oisp_t)
+            time.sleep(10)
 
     client.on_connect = on_connect
     client.on_message = on_message
