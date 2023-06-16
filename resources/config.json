@@ -1,0 +1,26 @@
+{
+    "fusionmqttdataservice": {
+        "specification": [
+            {
+                "topic": "kjellberg/plasma/Q-Series/Q-3000/system/status/qunit/json",
+                "key": ["DEVICE_STATUS"],
+                "parameter": ["status"]
+            },
+            {
+                "topic": "kjellberg/plasma/Q-Series/Q-3000/system/status/qunit/coolant/json",
+                "key": ["TEMPERATURE"],
+                "parameter": ["temperature"]
+            },
+            {
+                "topic": "kjellberg/plasma/Q-Series/Q-3000/consumption/power/json",
+                "key": ["POWER_SUPPLY"],
+                "parameter": ["power"]
+            },
+            {
+                "topic": "kjellberg/plasma/Q-Series/Q-3000/parameter/actual/json",
+                "key": ["CUTTING_CURRENT", "CUTTING_VOLTAGE", "VOLTAGE_SUPPLY"],
+                "parameter": ["cuttingCurrent", "cuttingVoltage", "voltageSupply"]
+            }
+        ]
+    }
+}

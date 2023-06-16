@@ -9,7 +9,6 @@ OISP_API_ROOT = os.environ.get('OISP_API_ROOT')
 USERNAME = os.environ.get('USERNAME')
 PASSWORD = os.environ.get('PASSWORD')
 device_id = os.environ.get('OISP_DEVICE_ID')
-target_configs = os.environ.get('TARGET_CONFIGS').split(",")
 broker_url = os.environ.get('BROKER_URL')
 broker_port = os.environ.get('BROKER_PORT')
 oisp_url = os.environ.get('OISP_URL')
@@ -27,6 +26,10 @@ oisp_agent_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 oisp_agent_socket.connect((str(oisp_url), int(oisp_port)))
 #root = client.get_root_node()
 
+# Opening JSON file
+f = open("../resources/configs.json")
+target_configs = json.load(f)
+f.close()
 
 def registerComponent(n, t):
     try:
@@ -54,24 +57,36 @@ def parse_mqtt_forward(topic, payload):
     print("Parsing MQTT message")
     print(topic)
     print(payload)
-    for item in target_configs:
+    for item in target_configs['fusionmqttdataservice']['specification']:
         time.sleep(1)
-        if topic == str(item.split("|")[0]):
-            mqtt_topic = item.split("|")[0]
-            mqtt_variable = item.split("|")[1]
-            oisp_n = item.split("|")[2]
-            mqtt_value_json = json.loads(payload)
+        if topic == str(item['topic']):
+            if not item['key']:
+                oisp_n = "Property/http://www.industry-fusion.org/fields#" + item['parameter'][0]
 
-            if str(oisp_n) == "Property/http://www.industry-fusion.org/fields#status" and int(mqtt_value_json[mqtt_variable]) == 7:
-                mqtt_value = 2
+                if str(oisp_n) == "Property/http://www.industry-fusion.org/fields#status":
+                    mqtt_value = 2
+                else:
+                    mqtt_value = str(payload)
+                    mqtt_value = round(float(mqtt_value), 3)
 
-            elif str(oisp_n) == "Property/http://www.industry-fusion.org/fields#status":
-                mqtt_value = 1
             else:
-                mqtt_value = mqtt_value_json[mqtt_variable]
-                mqtt_value = round(float(mqtt_value), 3)
-        
-            sendOispData(n=oisp_n, v=mqtt_value)
+                param_count = 0
+                for i in item['key']:
+                    oisp_n = "Property/http://www.industry-fusion.org/fields#" + item['parameter'][param_count]
+                    mqtt_value_json = json.loads(payload)
+
+                    if str(oisp_n) == "Property/http://www.industry-fusion.org/fields#status":
+                        mqtt_value = 2
+                    else:
+                        try:
+                            mqtt_value = mqtt_value_json[i]
+                            mqtt_value = round(float(mqtt_value), 3)
+                        except Exception as e:
+                            print(e)
+
+                    param_count += 1
+                
+                    sendOispData(n=oisp_n, v=mqtt_value)
 
 
 def on_connect(client, userdata, flags, rc):
@@ -105,12 +120,12 @@ if __name__ == "__main__":
                 print("Deleting component: " + components['cid'])
                 time.sleep(2)
                 device.delete_component(components['cid'])
-            
-    for item in target_configs:
-        oisp_n = item.split("|")[2]
-        oisp_t = item.split("|")[3]
+
+    for item in target_configs['fusionmqttdataservice']['specification']:
+        oisp_n = "Property/http://www.industry-fusion.org/fields#" + item['parameter']
+        oisp_t = "property.v1.0"
         registerComponent(oisp_n, oisp_t)
-        time.sleep(20)
+        time.sleep(10)
 
     client.on_connect = on_connect
     client.on_message = on_message
