@@ -64,7 +64,7 @@ def parse_mqtt_forward(topic, payload):
                 time.sleep(0.5)
                 oisp_n = "Property/http://www.industry-fusion.org/fields#" + item['parameter'][0]
 
-                if str(oisp_n) == "Property/http://www.industry-fusion.org/fields#machine_state":
+                if str(oisp_n) == "Property/http://www.industry-fusion.org/fields#base-objects-v0.1-operation-conditions-runtime-machine-state":
                     mqtt_value = 2
                 else:
                     mqtt_value = str(payload)
@@ -79,7 +79,7 @@ def parse_mqtt_forward(topic, payload):
                     oisp_n = "Property/http://www.industry-fusion.org/fields#" + item['parameter'][param_count]
                     mqtt_value_json = json.loads(payload)
 
-                    if str(oisp_n) == "Property/http://www.industry-fusion.org/fields#machine_state":
+                    if str(oisp_n) == "Property/http://www.industry-fusion.org/fields#base-objects-v0.1-operation-conditions-runtime-machine-state":
                         mqtt_value = 2
                     else:
                         try:
