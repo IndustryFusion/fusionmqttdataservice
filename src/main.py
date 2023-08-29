@@ -65,8 +65,10 @@ def parse_mqtt_forward(topic, payload):
                 oisp_n = "Property/http://www.industry-fusion.org/fields#" + item['parameter'][0]
 
                 check = str(oisp_n).split("-")
-                if "state" in check:
+                if "state" in check and (str(payload) != "0" or payload != False or str(payload) != "false" or str(payload) != "False" or str(payload) != "Idle" or str(payload) != "0.0" or str(payload) != "Offline"):
                     mqtt_value = 2
+                elif "state" in check and (str(payload) == "0" or payload == False or str(payload) == "false" or str(payload) == "False" or str(payload) == "Idle" or str(payload) == "0.0" or str(payload) == "Offline"):
+                    mqtt_value = 0
                 else:
                     mqtt_value = str(payload)
                     mqtt_value = round(float(mqtt_value), 3)
@@ -81,8 +83,10 @@ def parse_mqtt_forward(topic, payload):
                     mqtt_value_json = json.loads(payload)
 
                     check = str(oisp_n).split("-")
-                    if "state" in check:
+                    if "state" in check and (str(mqtt_value_json[i]) != "0" or mqtt_value_json[i] != False or str(mqtt_value_json[i]) != "false" or str(mqtt_value_json[i]) != "False" or str(mqtt_value_json[i]) != "Idle" or str(mqtt_value_json[i]) != "0.0" or str(mqtt_value_json[i]) != "Offline"):
                         mqtt_value = 2
+                    elif "state" in check and (str(mqtt_value_json[i]) == "0" or mqtt_value_json[i] == False or str(mqtt_value_json[i]) == "false" or str(mqtt_value_json[i]) == "False" or str(mqtt_value_json[i]) == "Idle" or str(mqtt_value_json[i]) == "0.0" or str(mqtt_value_json[i]) == "Offline"):
+                        mqtt_value = 0
                     else:
                         try:
                             mqtt_value = mqtt_value_json[i]
