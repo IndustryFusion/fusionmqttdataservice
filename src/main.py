@@ -13,12 +13,13 @@ broker_url = os.environ.get('BROKER_URL')
 broker_port = os.environ.get('BROKER_PORT')
 oisp_url = os.environ.get('OISP_URL')
 oisp_port = os.environ.get('OISP_PORT')
-
+sleepInp = os.environ.get('SLEEP')
 oisp_client = oisp.Client(api_root=OISP_API_ROOT)
 oisp_client.auth(USERNAME, PASSWORD)
 
 time.sleep(25)
-
+time.sleep(int(sleepInp))
+           
 oisp_agent_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 #client = Client(opc_url + ":" + opc_port)
 
