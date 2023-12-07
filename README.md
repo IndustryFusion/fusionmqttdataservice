@@ -1,6 +1,5 @@
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIndustryFusion%2Ffusionmqttdataservice.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2FIndustryFusion%2Ffusionmqttdataservice?ref=badge_shield&issueType=license)
 
-
 # Fusion MQTT Data Service
 
 This Python script facilitates the integration between a MQTT broker server and the PDT Gateway services by performing the following tasks:
