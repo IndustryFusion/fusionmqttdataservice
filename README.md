@@ -1,4 +1,6 @@
 # Fusion MQTT Data Service
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIndustryFusion%2Ffusionmqttdataservice.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FIndustryFusion%2Ffusionmqttdataservice?ref=badge_shield)
+
 
 This Python script facilitates the integration between a MQTT broker server and the PDT Gateway services by performing the following tasks:
 
@@ -150,3 +152,6 @@ From the root project folder.
 `docker build -t <image name> .`
 
 `docker run -d -e OISP_API_ROOT="https://<PDT URL>/oisp/v1/api" -e USERNAME=<Username from PDT Keycloak> -e PASSWORD=<Passowrd from PDT Keycloak> -e OISP_DEVICE_ID=<Device ID of the asset in PDT - Scorpio API to which the data must be sent> -e OISP_URL=<URL of the OISP Agent> -e OISP_PORT=7070 -e BROKER_URL=<URL of the central MQTT Broker> -e BROKER_PORT="1883" -e SLEEP=<Explicit Sleep, if needed, or else keep this blank> -v <config file path>:resources/config.json`
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIndustryFusion%2Ffusionmqttdataservice.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FIndustryFusion%2Ffusionmqttdataservice?ref=badge_large)
