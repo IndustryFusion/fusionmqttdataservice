@@ -5,6 +5,7 @@ import socket
 import time
 import oisp
 
+# Fetching all environment variables
 OISP_API_ROOT = os.environ.get('OISP_API_ROOT')
 USERNAME = os.environ.get('USERNAME')
 PASSWORD = os.environ.get('PASSWORD')
@@ -17,21 +18,21 @@ sleepInp = os.environ.get('SLEEP')
 oisp_client = oisp.Client(api_root=OISP_API_ROOT)
 oisp_client.auth(USERNAME, PASSWORD)
 
+# Explicit sleep to wait for OISP agent to work
 time.sleep(25)
 time.sleep(int(sleepInp))
            
 oisp_agent_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#client = Client(opc_url + ":" + opc_port)
 
-#client.connect()
 oisp_agent_socket.connect((str(oisp_url), int(oisp_port)))
-#root = client.get_root_node()
 
-# Opening JSON file
+# Opening JSON config file for MQTT - machine specific config from mounted path in runtime
 f = open("../resources/config.json")
 target_configs = json.load(f)
 f.close()
 
+
+# Method to register the propertires in MQTT config with PDT
 def registerComponent(n, t):
     try:
         msgFromClient = '{"n": "' + n + '", "t": "' + t + '"}'
@@ -43,6 +44,7 @@ def registerComponent(n, t):
         print("Could not register component to OISP")
 
 
+# Method to send the value of the MQTT topic to PDT with its property
 def sendOispData(n, v):
     try:
         msgFromClient = '{"n": "' + n + '", "v": "' + str(v) + '"}'
@@ -54,6 +56,7 @@ def sendOispData(n, v):
         print("Could not send data to OISP")
 
 
+# Method to parse the MQTT message on reception
 def parse_mqtt_forward(topic, payload):
     print("Parsing MQTT message")
     print(topic)
@@ -126,6 +129,7 @@ def parse_mqtt_forward(topic, payload):
                         sendOispData(n=oisp_n, v=mqtt_value)
 
 
+# Callback method for successful connection
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code "+str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
@@ -146,6 +150,7 @@ if __name__ == "__main__":
 
     time.sleep(20)
 
+    # Get PDT Device GW account and delete the previously registered varibales to ignore errors in the new registration
     accounts = oisp_client.get_accounts()
     account = accounts[0]
     devices = account.get_devices()
@@ -160,6 +165,7 @@ if __name__ == "__main__":
                 device.delete_component(components['cid'])
 
 
+    # Method call for registering the device properties
     for item in target_configs['fusionmqttdataservice']['specification']:
         for j in item['parameter']:
             oisp_n = "Property/http://www.industry-fusion.org/fields#" + j
@@ -167,6 +173,8 @@ if __name__ == "__main__":
             registerComponent(oisp_n, oisp_t)
             time.sleep(10)
 
+
+    # Callback method initialization
     client.on_connect = on_connect
     client.on_message = on_message
 
