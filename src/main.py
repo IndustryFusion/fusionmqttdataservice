@@ -23,7 +23,6 @@ import time
 import oisp
 
 # Fetching all environment variables
-device_id = os.environ.get('OISP_DEVICE_ID')
 broker_url = os.environ.get('BROKER_URL')
 broker_port = os.environ.get('BROKER_PORT')
 oisp_url = os.environ.get('OISP_URL')
