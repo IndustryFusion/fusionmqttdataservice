@@ -23,25 +23,20 @@ import time
 import oisp
 
 # Fetching all environment variables
-OISP_API_ROOT = os.environ.get('OISP_API_ROOT')
-USERNAME = os.environ.get('USERNAME')
-PASSWORD = os.environ.get('PASSWORD')
 device_id = os.environ.get('OISP_DEVICE_ID')
 broker_url = os.environ.get('BROKER_URL')
 broker_port = os.environ.get('BROKER_PORT')
 oisp_url = os.environ.get('OISP_URL')
 oisp_port = os.environ.get('OISP_PORT')
 sleepInp = os.environ.get('SLEEP')
-oisp_client = oisp.Client(api_root=OISP_API_ROOT)
-oisp_client.auth(USERNAME, PASSWORD)
 
 # Explicit sleep to wait for OISP agent to work
 time.sleep(25)
 time.sleep(int(sleepInp))
            
-oisp_agent_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+iff_agent_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-oisp_agent_socket.connect((str(oisp_url), int(oisp_port)))
+iff_agent_socket.connect((str(oisp_url), int(oisp_port)))
 
 # Opening JSON config file for MQTT - machine specific config from mounted path in runtime
 f = open("../resources/config.json")
@@ -49,23 +44,11 @@ target_configs = json.load(f)
 f.close()
 
 
-# Method to register the propertires in MQTT config with PDT
-def registerComponent(n, t):
-    try:
-        msgFromClient = '{"n": "' + n + '", "t": "' + t + '"}'
-        print(msgFromClient)
-        oisp_agent_socket.send(str.encode(msgFromClient))
-        print("Registered component to OISP: " + n + " " + t)
-    except Exception as e:
-        print(e)
-        print("Could not register component to OISP")
-
-
 # Method to send the value of the MQTT topic to PDT with its property
 def sendOispData(n, v):
     try:
-        msgFromClient = '{"n": "' + n + '", "v": "' + str(v) + '"}'
-        oisp_agent_socket.send(str.encode(msgFromClient))
+        msgFromClient = '{"n": "' + n + '", "v": "' + str(v) + '", "t": "Property"}'
+        iff_agent_socket.send(str.encode(msgFromClient))
         print("Sent data to OISP: " + n + " " + str(v))
         print(msgFromClient)
     except Exception as e:
@@ -166,30 +149,6 @@ if __name__ == "__main__":
     client = mqtt.Client()
 
     time.sleep(20)
-
-    # Get PDT Device GW account and delete the previously registered varibales to ignore errors in the new registration
-    accounts = oisp_client.get_accounts()
-    account = accounts[0]
-    devices = account.get_devices()
-    
-    for j in range(len(devices)):
-        if str(device_id) == str(devices[j].device_id):
-            device = devices[j]
-            print(device.components)
-            for components in device.components:
-                print("Deleting component: " + components['cid'])
-                time.sleep(2)
-                device.delete_component(components['cid'])
-
-
-    # Method call for registering the device properties
-    for item in target_configs['fusionmqttdataservice']['specification']:
-        for j in item['parameter']:
-            oisp_n = "Property/http://www.industry-fusion.org/fields#" + j
-            oisp_t = "property.v1.0"
-            registerComponent(oisp_n, oisp_t)
-            time.sleep(10)
-
 
     # Callback method initialization
     client.on_connect = on_connect
