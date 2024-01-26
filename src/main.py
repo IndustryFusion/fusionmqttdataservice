@@ -20,13 +20,12 @@ import paho.mqtt.client as mqtt
 import os
 import socket
 import time
-import oisp
 
 # Fetching all environment variables
 broker_url = os.environ.get('BROKER_URL')
 broker_port = os.environ.get('BROKER_PORT')
-oisp_url = os.environ.get('OISP_URL')
-oisp_port = os.environ.get('OISP_PORT')
+oisp_url = os.environ.get('IFF_AGENT_UR')
+oisp_port = os.environ.get('IFF_AGENT_PORT')
 sleepInp = os.environ.get('SLEEP')
 
 # Explicit sleep to wait for OISP agent to work
