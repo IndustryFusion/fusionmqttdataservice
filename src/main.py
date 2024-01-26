@@ -24,7 +24,7 @@ import time
 # Fetching all environment variables
 broker_url = os.environ.get('BROKER_URL')
 broker_port = os.environ.get('BROKER_PORT')
-oisp_url = os.environ.get('IFF_AGENT_UR')
+oisp_url = os.environ.get('IFF_AGENT_URL')
 oisp_port = os.environ.get('IFF_AGENT_PORT')
 sleepInp = os.environ.get('SLEEP')
 
