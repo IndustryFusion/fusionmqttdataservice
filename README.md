@@ -131,4 +131,4 @@ From the root project folder.
 
 `docker build -t <image name> .`
 
-`docker run -d -e IFF_AGENT_URL=<URL of the IFF IoT Agent> -e IFF_AGENT_PORT=7070 -e BROKER_URL=<URL of the central MQTT Broker> -e BROKER_PORT="1883" -e SLEEP=<Explicit Sleep, if needed, or else keep this blank> -v <config file path>:resources/config.json`
+`docker run -d -e IFF_AGENT_URL=<URL of the IFF IoT Agent> -e IFF_AGENT_PORT=7070 -e BROKER_URL=<URL of the central MQTT Broker> -e BROKER_PORT="1883" -e SLEEP=<Explicit Sleep, if needed, or else keep this blank> -v <config file path>:resources/config.json <image name>`
