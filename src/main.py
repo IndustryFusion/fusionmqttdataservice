@@ -22,15 +22,20 @@ import socket
 import time
 
 # Fetching all environment variables
-broker_url = os.environ.get('BROKER_URL')
-broker_port = os.environ.get('BROKER_PORT')
+
+for key, value in os.environ.items():
+    if key.startswith('MQTT_BROKER_URI'):
+        akri_broker_url = os.environ.get(key)
+
+broker_url = akri_broker_url.split('//')[1].split(':')[0]
+broker_port = akri_broker_url.split('//')[1].split(':')[1]
+mqtt_username = os.environ.get('USERNAME')
+mqtt_password = os.environ.get('PASSWORD')
 oisp_url = os.environ.get('IFF_AGENT_URL')
 oisp_port = os.environ.get('IFF_AGENT_PORT')
-sleepInp = os.environ.get('SLEEP')
 
 # Explicit sleep to wait for OISP agent to work
 time.sleep(25)
-time.sleep(int(sleepInp))
            
 iff_agent_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
