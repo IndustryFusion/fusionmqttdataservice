@@ -14,12 +14,12 @@
 # limitations under the License.
 #
 
-
-import json
 import paho.mqtt.client as mqtt
 import os
 import socket
 import time
+import yaml
+import json
 
 # Fetching all environment variables
 
@@ -42,10 +42,9 @@ iff_agent_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 iff_agent_socket.connect((str(oisp_url), int(oisp_port)))
 
 # Opening JSON config file for MQTT - machine specific config from mounted path in runtime
-f = open("../resources/config.json")
-target_configs = json.load(f)
+f = open("../resources/config.yaml")
+target_configs = yaml.safe_load(f)
 f.close()
-
 
 # Method to send the value of the MQTT topic to PDT with its property
 def sendOispData(n, v):
