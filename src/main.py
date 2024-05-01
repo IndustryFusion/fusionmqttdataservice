@@ -49,7 +49,7 @@ f.close()
 # Method to send the value of the MQTT topic to PDT with its property
 def sendOispData(n, v):
     try:
-        msgFromClient = '{"n": "' + n + '", "v": "' + str(v) + '", "t": "Property"}'
+        msgFromClient = '{"n": "' + n + '", "v": "' + str(v) + '", "t": "Property", "d": "' + n + '"}'
         iff_agent_socket.send(str.encode(msgFromClient))
         print("Sent data to OISP: " + n + " " + str(v))
         print(msgFromClient)
