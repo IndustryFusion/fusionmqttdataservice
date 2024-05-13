@@ -49,7 +49,7 @@ f.close()
 # Method to send the value of the MQTT topic to PDT with its property
 def sendOispData(n, v):
     try:
-        msgFromClient = '{"n": "' + n + '", "v": "' + str(v) + '", "t": "Property", "d": "' + n + '"}'
+        msgFromClient = '{"n": "' + n + '", "v": "' + str(v) + '"}'
         iff_agent_socket.send(str.encode(msgFromClient))
         print("Sent data to OISP: " + n + " " + str(v))
         print(msgFromClient)
@@ -110,25 +110,51 @@ def parse_mqtt_forward(topic, payload):
                 else:
                     param_count = 0
                     for i in item['key']:
-                        time.sleep(0.5)
-                        oisp_n = "http://www.industry-fusion.org/fields#" + item['parameter'][param_count]
-                        mqtt_value_json = json.loads(payload)
+                        if 'em:0' not in str(item['key']):
+                            time.sleep(0.5)
+                            oisp_n = "http://www.industry-fusion.org/fields#" + item['parameter'][param_count]
+                            mqtt_value_json = json.loads(payload)
 
-                        check = str(oisp_n).split("-")
-                        if "state" in check and (str(mqtt_value_json[i]) != "0" or mqtt_value_json[i] != False or str(mqtt_value_json[i]) != "false" or str(mqtt_value_json[i]) != "False" or str(mqtt_value_json[i]) != "Idle" or str(mqtt_value_json[i]) != "0.0" or str(mqtt_value_json[i]) != "Offline"):
-                            mqtt_value = 2
-                        elif "state" in check and (str(mqtt_value_json[i]) == "0" or mqtt_value_json[i] == False or str(mqtt_value_json[i]) == "false" or str(mqtt_value_json[i]) == "False" or str(mqtt_value_json[i]) == "Idle" or str(mqtt_value_json[i]) == "0.0" or str(mqtt_value_json[i]) == "Offline"):
-                            mqtt_value = 0
+                            check = str(oisp_n).split("-")
+                            if "state" in check and (str(mqtt_value_json[i]) != "0" or mqtt_value_json[i] != False or str(mqtt_value_json[i]) != "false" or str(mqtt_value_json[i]) != "False" or str(mqtt_value_json[i]) != "Idle" or str(mqtt_value_json[i]) != "0.0" or str(mqtt_value_json[i]) != "Offline"):
+                                mqtt_value = 2
+                            elif "state" in check and (str(mqtt_value_json[i]) == "0" or mqtt_value_json[i] == False or str(mqtt_value_json[i]) == "false" or str(mqtt_value_json[i]) == "False" or str(mqtt_value_json[i]) == "Idle" or str(mqtt_value_json[i]) == "0.0" or str(mqtt_value_json[i]) == "Offline"):
+                                mqtt_value = 0
+                            else:
+                                try:
+                                    mqtt_value = mqtt_value_json[i]
+                                    mqtt_value = round(float(mqtt_value), 3)
+                                except Exception as e:
+                                    print(e)
+
+                            param_count += 1
+                        
+                            sendOispData(n=oisp_n, v=mqtt_value)
                         else:
-                            try:
-                                mqtt_value = mqtt_value_json[i]
-                                mqtt_value = round(float(mqtt_value), 3)
-                            except Exception as e:
-                                print(e)
+                            time.sleep(0.5)
+                            oisp_n = "http://www.industry-fusion.org/fields#" + item['parameter'][param_count]
+                            mqtt_value_json = json.loads(payload)
+                            tempo_mod = str(i).split(',')
+                            if tempo_mod[0] == 'params':
+                                mqtt_value_json = mqtt_value_json[tempo_mod[0]][tempo_mod[1]][tempo_mod[2]]
 
-                        param_count += 1
-                    
-                        sendOispData(n=oisp_n, v=mqtt_value)
+                            check = str(oisp_n).split("-")
+                            if "state" in check and (str(mqtt_value_json[i]) != "0" or mqtt_value_json[i] != False or str(mqtt_value_json[i]) != "false" or str(mqtt_value_json[i]) != "False" or str(mqtt_value_json[i]) != "Idle" or str(mqtt_value_json[i]) != "0.0" or str(mqtt_value_json[i]) != "Offline"):
+                                mqtt_value = 2
+                            elif "state" in check and (str(mqtt_value_json[i]) == "0" or mqtt_value_json[i] == False or str(mqtt_value_json[i]) == "false" or str(mqtt_value_json[i]) == "False" or str(mqtt_value_json[i]) == "Idle" or str(mqtt_value_json[i]) == "0.0" or str(mqtt_value_json[i]) == "Offline"):
+                                mqtt_value = 0
+                            else:
+                                try:
+                                    mqtt_value = mqtt_value_json
+                                    mqtt_value = round(float(mqtt_value), 3)
+                                except Exception as e:
+                                    print(e)
+
+                            param_count += 1
+                        
+                            sendOispData(n=oisp_n, v=mqtt_value)
+
+                        
 
 
 # Callback method for successful connection
