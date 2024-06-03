@@ -68,7 +68,7 @@ def parse_mqtt_forward(topic, payload):
         if topic == str(item['topic']):
             if not item['key']:
                 time.sleep(0.5)
-                oisp_n = "http://www.industry-fusion.org/fields#" + item['parameter'][0]
+                oisp_n = "https://industryfusion.github.io/contexts/tutorial/v0.1-dev/ontology/v0.1-dev/fields/" + item['parameter'][0]
 
                 check = str(oisp_n).split("-")
                 if "state" in check and (str(payload) != "0" or payload != False or str(payload) != "false" or str(payload) != "False" or str(payload) != "Idle" or str(payload) != "0.0" or str(payload) != "Offline"):
@@ -87,7 +87,7 @@ def parse_mqtt_forward(topic, payload):
                     param_count = 0
                     for i in item['key']:
                         time.sleep(0.5)
-                        oisp_n = "http://www.industry-fusion.org/fields#" + item['parameter'][param_count]
+                        oisp_n = "https://industryfusion.github.io/contexts/tutorial/v0.1-dev/ontology/v0.1-dev/fields/" + item['parameter'][param_count]
                         mqtt_value_json = json.loads(payload)
                         tempo_mod = str(i).split(',')
                         try:
@@ -115,7 +115,7 @@ def parse_mqtt_forward(topic, payload):
                     param_count = 0
                     for i in item['key']:
                             time.sleep(0.5)
-                            oisp_n = "http://www.industry-fusion.org/fields#" + item['parameter'][param_count]
+                            oisp_n = "https://industryfusion.github.io/contexts/tutorial/v0.1-dev/ontology/v0.1-dev/fields/" + item['parameter'][param_count]
                             mqtt_value_json = json.loads(payload)
 
                             check = str(oisp_n).split("-")
