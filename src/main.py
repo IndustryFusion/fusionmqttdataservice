@@ -68,9 +68,9 @@ def parse_mqtt_forward(topic, payload):
         if topic == str(item['topic']):
             if not item['key']:
                 time.sleep(0.5)
-                oisp_n = "https://industryfusion.github.io/contexts/tutorial/v0.1-dev/ontology/v0.1-dev/fields/" + item['parameter'][0]
+                oisp_n = item['parameter'][0]
 
-                check = str(oisp_n).split("-")
+                check = str(oisp_n).split("_")
                 if "state" in check and (str(payload) != "0" or payload != False or str(payload) != "false" or str(payload) != "False" or str(payload) != "Idle" or str(payload) != "0.0" or str(payload) != "Offline"):
                     mqtt_value = 2
                 elif "state" in check and (str(payload) == "0" or payload == False or str(payload) == "false" or str(payload) == "False" or str(payload) == "Idle" or str(payload) == "0.0" or str(payload) == "Offline"):
@@ -87,14 +87,14 @@ def parse_mqtt_forward(topic, payload):
                     param_count = 0
                     for i in item['key']:
                         time.sleep(0.5)
-                        oisp_n = "https://industryfusion.github.io/contexts/tutorial/v0.1-dev/ontology/v0.1-dev/fields/" + item['parameter'][param_count]
+                        oisp_n = item['parameter'][param_count]
                         mqtt_value_json = json.loads(payload)
                         tempo_mod = str(i).split(',')
                         try:
                             if mqtt_value_json[tempo_mod[0]]['em:0']:
                                 mqtt_value_json = mqtt_value_json[tempo_mod[0]][tempo_mod[1]][tempo_mod[2]]
 
-                                check = str(oisp_n).split("-")
+                                check = str(oisp_n).split("_")
                                 if "state" in check and (str(mqtt_value_json) != "0" or mqtt_value_json != False or str(mqtt_value_json) != "false" or str(mqtt_value_json) != "False" or str(mqtt_value_json) != "Idle" or str(mqtt_value_json) != "0.0" or str(mqtt_value_json) != "Offline"):
                                     mqtt_value = 2
                                 elif "state" in check and (str(mqtt_value_json) == "0" or mqtt_value_json == False or str(mqtt_value_json) == "false" or str(mqtt_value_json) == "False" or str(mqtt_value_json) == "Idle" or str(mqtt_value_json) == "0.0" or str(mqtt_value_json) == "Offline"):
@@ -115,10 +115,10 @@ def parse_mqtt_forward(topic, payload):
                     param_count = 0
                     for i in item['key']:
                             time.sleep(0.5)
-                            oisp_n = "https://industryfusion.github.io/contexts/tutorial/v0.1-dev/ontology/v0.1-dev/fields/" + item['parameter'][param_count]
+                            oisp_n = item['parameter'][param_count]
                             mqtt_value_json = json.loads(payload)
 
-                            check = str(oisp_n).split("-")
+                            check = str(oisp_n).split("_")
                             if "state" in check and (str(mqtt_value_json[i]) != "0" or mqtt_value_json[i] != False or str(mqtt_value_json[i]) != "false" or str(mqtt_value_json[i]) != "False" or str(mqtt_value_json[i]) != "Idle" or str(mqtt_value_json[i]) != "0.0" or str(mqtt_value_json[i]) != "Offline"):
                                 mqtt_value = 2
                             elif "state" in check and (str(mqtt_value_json[i]) == "0" or mqtt_value_json[i] == False or str(mqtt_value_json[i]) == "false" or str(mqtt_value_json[i]) == "False" or str(mqtt_value_json[i]) == "Idle" or str(mqtt_value_json[i]) == "0.0" or str(mqtt_value_json[i]) == "Offline"):
