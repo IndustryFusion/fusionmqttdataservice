@@ -23,9 +23,7 @@ import json
 
 # Fetching all environment variables
 
-for key, value in os.environ.items():
-    if key.startswith('MQTT_BROKER_URI'):
-        akri_broker_url = os.environ.get(key)
+akri_broker_url = os.environ.get('PROTOCOL_URL')
 
 broker_url = akri_broker_url.split('//')[1].split(':')[0]
 broker_port = akri_broker_url.split('//')[1].split(':')[1]
