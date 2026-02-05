@@ -73,12 +73,13 @@ def parse_mqtt_forward(topic, payload):
                     mqtt_value = 2
                 elif "state" in check and (str(payload) == "0" or payload == False or str(payload) == "false" or str(payload) == "False" or str(payload) == "Idle" or str(payload) == "0.0" or str(payload) == "Offline"):
                     mqtt_value = 1
-                elif mqtt_value == None:
-                    sendOispData(n="https://industry-fusion.org/base/v0.1/machine_state", v="0")
-                    continue
                 else:
-                    mqtt_value = str(payload)
-                    mqtt_value = round(float(mqtt_value), 3)
+                    try:
+                        mqtt_value = str(payload)
+                        mqtt_value = round(float(mqtt_value), 3)
+                    except (ValueError, TypeError):
+                        sendOispData(n="https://industry-fusion.org/base/v0.1/machine_state", v="0")
+                        continue
 
                 sendOispData(n=oisp_n, v=mqtt_value)
 
@@ -100,9 +101,6 @@ def parse_mqtt_forward(topic, payload):
                                     mqtt_value = 2
                                 elif "state" in check and (str(mqtt_value_json) == "0" or mqtt_value_json == False or str(mqtt_value_json) == "false" or str(mqtt_value_json) == "False" or str(mqtt_value_json) == "Idle" or str(mqtt_value_json) == "0.0" or str(mqtt_value_json) == "Offline"):
                                     mqtt_value = 1
-                                elif mqtt_value == None:
-                                    sendOispData(n="https://industry-fusion.org/base/v0.1/machine_state", v="0")
-                                    continue
                                 else:
                                     try:
                                         mqtt_value = mqtt_value_json
@@ -110,6 +108,7 @@ def parse_mqtt_forward(topic, payload):
                                     except Exception as e:
                                         print(e)
                                         sendOispData(n="https://industry-fusion.org/base/v0.1/machine_state", v="0")
+                                        continue
 
                                 param_count += 1
                             
@@ -129,9 +128,6 @@ def parse_mqtt_forward(topic, payload):
                                 mqtt_value = 2
                             elif "state" in check and (str(mqtt_value_json[i]) == "0" or mqtt_value_json[i] == False or str(mqtt_value_json[i]) == "false" or str(mqtt_value_json[i]) == "False" or str(mqtt_value_json[i]) == "Idle" or str(mqtt_value_json[i]) == "0.0" or str(mqtt_value_json[i]) == "Offline"):
                                 mqtt_value = 1
-                            elif mqtt_value == None:
-                                sendOispData(n="https://industry-fusion.org/base/v0.1/machine_state", v="0")
-                                continue
                             else:
                                 try:
                                     mqtt_value = mqtt_value_json[i]
@@ -139,6 +135,7 @@ def parse_mqtt_forward(topic, payload):
                                 except Exception as e:
                                     print(e)
                                     sendOispData(n="https://industry-fusion.org/base/v0.1/machine_state", v="0")
+                                    continue
 
                             param_count += 1
                         
