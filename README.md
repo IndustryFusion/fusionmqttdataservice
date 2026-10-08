@@ -63,72 +63,117 @@ The above docker container also expects a config file with the name config.json 
 
 Update the "host" variable with the correct PDT URL.
 
-## Local Setup
+## Configuration
 
-From the root directory of this project run the below commands to install and activate venv. For the econd time, just use the activate command.
+All settings come from environment variables. In a gateway deployment the
+onboarding controller (iff-akri-controller) sets them from the Factory Manager
+onboarding form.
 
-**To install venv**
+| Variable | Meaning | Default |
+|---|---|---|
+| `PROTOCOL_URL` | MQTT broker, e.g. `mqtt://192.168.189.186:1883` | required |
+| `IFF_AGENT_URL` | Host of the IFF IoT agent | `127.0.0.1` |
+| `IFF_AGENT_UDP_PORT` | UDP port of the IFF IoT agent (`listeners.udp_port`) | `41234` |
+| `CONFIG_PATH` | Path of the topic configuration | `../resources/config.yaml` |
+| `STARTUP_DELAY` | Seconds to wait for the agent before connecting | `45` |
+| `LOG_LEVEL` | `DEBUG` also logs every value sent | `INFO` |
 
-`python3 -m venv .venv`
+`USERNAME` and `PASSWORD` are not used. The onboarding controller passes the
+same pair to every data service in a pod, so they belong to the OPC-UA server
+when both run together.
 
-**To activate**
+Values are sent to the agent over UDP, one JSON array per datagram.
+`IFF_AGENT_PORT` (TCP) is no longer used.
 
-`source .venv/bin/activate`
+The topic configuration (`config.yaml`) lists the topics to subscribe to and,
+optionally, how to transform their values:
 
-**Install required modules**
-
-`pip3 install -r requirements.txt`
-
-**Run the project (export environment varibales first as shown below)**
-
-`export IFF_AGENT_URL=<URL of the IFF IoT Agent>`
-
-Example: "127.0.0.1", if the agent is started in local as mentioned in the prerequisites. Or a valid DNS or IP from the cloud.
-
-`export IFF_AGENT_PORT="7070"`
-
-
-`export BROKER_URL=<URL of the central MQTT Broker>`
-
-Example: "192.168.189.186".
-
-
-`export BROKER_PORT="1883"`
-
-`export SLEEP=<Explicit Sleep, if needed, or else keep this blank>`
-
-Also, the fusion MQTT service expects a config file with the name config.json in the 'resources' folder in the root project folder containing MQTT topic and selector keys, PDT device property names as shown below in the example.
-
-```json
-{
-    "fusionmqttdataservice": {
-        "specification": [
-            {
-                "topic": "kjellberg/plasma/Q-Series/Q-4500/system/status/qunit/json",
-                "key": ["DEVICE_STATUS"],
-                "parameter": ["machine-state"]
-            },
-            {
-                "topic": "some topic name",
-                "key": ["some key"],
-                "parameter": ["some PDT property name"]
-            }
-        ]
-    }
-}
+```yaml
+fusionmqttdataservice:
+  specification:
+    - topic: "machine/status"            # no key: the whole payload is the value
+      key: []
+      parameter: ["https://industry-fusion.org/base/v0.1/machine_state"]
+    - topic: "machine/data"              # keys: the payload is JSON
+      key: ["temp", "mv"]
+      parameter:
+        - "https://industry-fusion.org/base/v0.1/temperature"
+        - "https://industry-fusion.org/base/v0.1/voltage"
+    - topic: "shellypro3em/events/rpc"   # a key can be a path: comma-separated
+      key: ["params,em:0,a_current"]
+      parameter: ["https://industry-fusion.org/base/v0.1/current"]
+  transforms:
+    version: 1
+    rules:
+      - parameter: "https://industry-fusion.org/base/v0.1/machine_state"
+        map:
+          cases:
+            - { eq: "Running", out: "2" }
+            - { eq: "Idle", out: "1" }
+          fallback: { value: "0" }
+        on_error: "0"                    # sent when the broker connection is lost
+      - parameter: "https://industry-fusion.org/base/v0.1/voltage"
+        linear: { factor: 0.001, offset: 0, decimals: 3, from: mV, to: V }
 ```
 
-**Run the service**
+How the values are taken from a message:
+- **No key:** the whole payload is the value of the first parameter.
+- **Keys:** each key is paired with the parameter at the same position. A key is
+  a path into the JSON payload; separate the levels with commas.
+- **A missing key:** a message that does not contain a key carries no value for
+  that parameter. One topic often carries several kinds of message.
+- **Wildcards:** topics may use them (`plant/+/temp`).
 
-`python src/main.py`
+## Value transforms
 
+The service sends what it receives. It has no built-in knowledge of what any
+property means. Every interpretation comes from `transforms`, which Factory
+Manager writes from the "Value Transforms" step of its onboarding form. The
+engine (`src/transform.py`) is the same as in the OPC-UA data service, and so
+are its tests (`tests/transform_cases.json`). Change them in both places.
+
+- **No rule:** the value is sent as received.
+- **`map`:** cases are tried in order and the first match wins.
+  - `eq` compares numbers numerically and text without regard to case or
+    surrounding spaces.
+  - `min`/`max` is an inclusive range.
+  - `bit` matches when that bit of a whole, non-negative value is set.
+  - If nothing matches, `fallback` decides: `drop` (send nothing), `raw` (send
+    the value as received), or `{value: ...}`.
+- **`linear`:** sends `value × factor + offset`, rounded half away from zero to
+  `decimals`. With a `map` as well, the map runs first and its numbers are then
+  converted.
+- **`on_error`:** sent when the connection to the broker is lost or refused.
+- **A rule that is not valid** drops its parameter's values and logs an error.
+
+## Local Setup
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+pip3 install -r requirements.txt
+export PROTOCOL_URL=mqtt://192.168.189.186:1883
+export IFF_AGENT_URL=127.0.0.1
+export CONFIG_PATH=$PWD/resources/config.yaml
+export STARTUP_DELAY=0
+python src/main.py
+```
+
+## Tests
+
+The image runs Python 3.8, so run the tests there:
+
+```sh
+docker run --rm -v "$PWD":/work -w /work python:3.8 \
+  sh -c 'pip install -q -r requirements.txt -r requirements-dev.txt && python -m pytest -q tests'
+```
 
 ## Docker build and run
 
-To build this project using Docker and run it, follow the below instructions.
+From the root project folder:
 
-From the root project folder.
-
-`docker build -t <image name> .`
-
-`docker run -d -e IFF_AGENT_URL=<URL of the IFF IoT Agent> -e IFF_AGENT_PORT=7070 -e BROKER_URL=<URL of the central MQTT Broker> -e BROKER_PORT="1883" -e SLEEP=<Explicit Sleep, if needed, or else keep this blank> -v <config file path>:resources/config.json <image name>`
+```sh
+docker build -t <image name> .
+docker run -d --network host -e PROTOCOL_URL=mqtt://<broker>:1883 -e IFF_AGENT_URL=127.0.0.1 \
+  -v <config file path>:/resources/config.yaml <image name>
+```

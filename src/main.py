@@ -14,172 +14,177 @@
 # limitations under the License.
 #
 
-import paho.mqtt.client as mqtt
+# Subscribes to the configured MQTT topics and sends the values to the IFF
+# agent. Values are sent as received; what they mean for the digital twin is
+# decided only by the transform rules from Factory Manager (see transform.py).
+
+import json
+import logging
 import os
 import socket
 import time
+from urllib.parse import urlparse
+
+import paho.mqtt.client as mqtt
 import yaml
-import json
 
-# Fetching all environment variables
+from transform import Transformer
 
-akri_broker_url = os.environ.get('PROTOCOL_URL')
+logger = logging.getLogger('fusionmqttdataservice')
 
-broker_url = akri_broker_url.split('//')[1].split(':')[0]
-broker_port = akri_broker_url.split('//')[1].split(':')[1]
-mqtt_username = os.environ.get('USERNAME')
-mqtt_password = os.environ.get('PASSWORD')
-oisp_url = os.environ.get('IFF_AGENT_URL')
-oisp_port = os.environ.get('IFF_AGENT_PORT')
+# Messages per UDP datagram; keeps each datagram far below the UDP size limit
+BATCH_SIZE = 50
 
-# Explicit sleep to wait for OISP agent to work
-time.sleep(25)
-           
-iff_agent_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+MISSING = object()
 
-iff_agent_socket.connect((str(oisp_url), int(oisp_port)))
 
-# Opening JSON config file for MQTT - machine specific config from mounted path in runtime
-f = open("../resources/config.yaml")
-target_configs = yaml.safe_load(f)
-f.close()
+class AgentSender:
+    """Sends to the IFF agent over UDP: one datagram is one JSON array, so
+    messages can never run together the way they can on the TCP listener."""
 
-# Method to send the value of the MQTT topic to PDT with its property
-def sendOispData(n, v):
+    def __init__(self, host, port):
+        self.address = (host, port)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    def send(self, values):
+        messages = [{'n': parameter, 'v': value, 't': 'Property'} for parameter, value in values]
+        for start in range(0, len(messages), BATCH_SIZE):
+            batch = messages[start:start + BATCH_SIZE]
+            try:
+                self.sock.sendto(json.dumps(batch).encode('utf-8'), self.address)
+            except OSError as e:
+                logger.warning('Could not send to the IFF agent at %s:%s: %s', *self.address, e)
+                return
+            logger.debug('Sent %s', batch)
+
+
+def lookup(document, path):
+    """The value at a path of keys (and list indexes) in a JSON document, or MISSING."""
+    value = document
+    for part in path:
+        if isinstance(value, dict) and part in value:
+            value = value[part]
+        elif isinstance(value, list) and part.lstrip('-').isdigit() and -len(value) <= int(part) < len(value):
+            value = value[int(part)]
+        else:
+            return MISSING
+    return value
+
+
+def readings(item, payload):
+    """(parameter, value) for each parameter of a mapping that this message carries.
+
+    Without keys the whole payload is the value of the first parameter. With
+    keys the payload is JSON, and each key is a comma-separated path into it
+    ("temperature", or "params,em:0,a_current"), paired with the parameter at
+    the same position. A message that does not contain a key simply carries no
+    value for that parameter: one topic often carries several kinds of message.
+    """
+    parameters = item.get('parameter') or []
+    if isinstance(parameters, str):
+        parameters = [parameters]
+    keys = item.get('key') or []
+    if not keys:
+        return [(parameters[0], payload)] if parameters else []
     try:
-        msgFromClient = '{"n": "' + n + '", "v": "' + str(v) + '"}'
-        iff_agent_socket.send(str.encode(msgFromClient))
-        print("Sent data to OISP: " + n + " " + str(v))
-        print(msgFromClient)
-    except Exception as e:
-        print(e)
-        print("Could not send data to OISP")
+        document = json.loads(payload)
+    except ValueError:
+        logger.debug('Message on %s is not JSON, so its keys cannot be read', item.get('topic'))
+        return []
+    found = []
+    for key, parameter in zip(keys, parameters):
+        value = lookup(document, [part.strip() for part in str(key).split(',')])
+        if value is not MISSING:
+            # Objects and lists are sent as JSON text
+            found.append((parameter, json.dumps(value) if isinstance(value, (dict, list)) else value))
+    return found
 
 
-# Method to parse the MQTT message on reception
-def parse_mqtt_forward(topic, payload):
-    print("Parsing MQTT message")
-    print(topic)
-    print(payload)
-    for item in target_configs['fusionmqttdataservice']['specification']:
-        time.sleep(0.5)
-        if topic == str(item['topic']):
-            if not item['key']:
-                time.sleep(0.5)
-                oisp_n = item['parameter'][0]
+class Service:
+    def __init__(self, specification, transformer, sender):
+        self.specification = specification
+        self.transformer = transformer
+        self.sender = sender
+        self.parameters = []
+        for item in specification:
+            parameters = item.get('parameter') or []
+            for parameter in [parameters] if isinstance(parameters, str) else parameters:
+                if parameter not in self.parameters:
+                    self.parameters.append(parameter)
 
-                check = str(oisp_n).split("_")
-                if "state" in check and (str(payload) != "0" or payload != False or str(payload) != "false" or str(payload) != "False" or str(payload) != "Idle" or str(payload) != "0.0" or str(payload) != "Offline"):
-                    mqtt_value = 2
-                elif "state" in check and (str(payload) == "0" or payload == False or str(payload) == "false" or str(payload) == "False" or str(payload) == "Idle" or str(payload) == "0.0" or str(payload) == "Offline"):
-                    mqtt_value = 1
-                else:
-                    try:
-                        mqtt_value = str(payload)
-                        mqtt_value = round(float(mqtt_value), 3)
-                    except (ValueError, TypeError):
-                        sendOispData(n="https://industry-fusion.org/base/v0.1/machine_state", v="0")
-                        continue
+    def handle(self, topic, payload):
+        """Transform and send the values one message carries."""
+        values = []
+        for item in self.specification:
+            if not mqtt.topic_matches_sub(str(item['topic']), topic):
+                continue
+            for parameter, raw in readings(item, payload):
+                value = self.transformer.convert(parameter, raw)
+                if value is not None:
+                    values.append((parameter, value))
+        self.sender.send(values)
 
-                sendOispData(n=oisp_n, v=mqtt_value)
+    def unreachable(self):
+        """The machine cannot be read: send each rule's on_error value."""
+        self.sender.send(self.transformer.error_values(self.parameters).items())
 
-            elif item['key']:
-                split_check = str(item['key'][0]).split(":")
-                if len(split_check) > 1:
-                    param_count = 0
-                    for i in item['key']:
-                        time.sleep(0.5)
-                        oisp_n = item['parameter'][param_count]
-                        mqtt_value_json = json.loads(payload)
-                        tempo_mod = str(i).split(',')
-                        try:
-                            if mqtt_value_json[tempo_mod[0]]['em:0']:
-                                mqtt_value_json = mqtt_value_json[tempo_mod[0]][tempo_mod[1]][tempo_mod[2]]
+    # paho callbacks
+    def on_connect(self, client, userdata, flags, rc):
+        if rc != 0:
+            logger.warning('The broker refused the connection (result code %s)', rc)
+            self.unreachable()
+            return
+        logger.info('Connected to the broker')
+        # Subscribing here renews the subscriptions after every reconnect
+        for item in self.specification:
+            client.subscribe(str(item['topic']))
 
-                                check = str(oisp_n).split("_")
-                                if "state" in check and (str(mqtt_value_json) != "0" or mqtt_value_json != False or str(mqtt_value_json) != "false" or str(mqtt_value_json) != "False" or str(mqtt_value_json) != "Idle" or str(mqtt_value_json) != "0.0" or str(mqtt_value_json) != "Offline"):
-                                    mqtt_value = 2
-                                elif "state" in check and (str(mqtt_value_json) == "0" or mqtt_value_json == False or str(mqtt_value_json) == "false" or str(mqtt_value_json) == "False" or str(mqtt_value_json) == "Idle" or str(mqtt_value_json) == "0.0" or str(mqtt_value_json) == "Offline"):
-                                    mqtt_value = 1
-                                else:
-                                    try:
-                                        mqtt_value = mqtt_value_json
-                                        mqtt_value = round(float(mqtt_value), 3)
-                                    except Exception as e:
-                                        print(e)
-                                        sendOispData(n="https://industry-fusion.org/base/v0.1/machine_state", v="0")
-                                        continue
+    def on_message(self, client, userdata, msg):
+        try:
+            self.handle(msg.topic, msg.payload.decode('utf-8', errors='replace'))
+        except Exception:  # one bad message must not stop the client
+            logger.exception('Could not handle a message on %s', msg.topic)
 
-                                param_count += 1
-                            
-                                sendOispData(n=oisp_n, v=mqtt_value)
-                        except KeyError:
-                            print("Key 'em:0' does not exist.")
-                            sendOispData(n="https://industry-fusion.org/base/v0.1/machine_state", v="0")
-                else:
-                    param_count = 0
-                    for i in item['key']:
-                            time.sleep(0.5)
-                            oisp_n = item['parameter'][param_count]
-                            mqtt_value_json = json.loads(payload)
-
-                            check = str(oisp_n).split("_")
-                            if "state" in check and (str(mqtt_value_json[i]) != "0" or mqtt_value_json[i] != False or str(mqtt_value_json[i]) != "false" or str(mqtt_value_json[i]) != "False" or str(mqtt_value_json[i]) != "Idle" or str(mqtt_value_json[i]) != "0.0" or str(mqtt_value_json[i]) != "Offline"):
-                                mqtt_value = 2
-                            elif "state" in check and (str(mqtt_value_json[i]) == "0" or mqtt_value_json[i] == False or str(mqtt_value_json[i]) == "false" or str(mqtt_value_json[i]) == "False" or str(mqtt_value_json[i]) == "Idle" or str(mqtt_value_json[i]) == "0.0" or str(mqtt_value_json[i]) == "Offline"):
-                                mqtt_value = 1
-                            else:
-                                try:
-                                    mqtt_value = mqtt_value_json[i]
-                                    mqtt_value = round(float(mqtt_value), 3)
-                                except Exception as e:
-                                    print(e)
-                                    sendOispData(n="https://industry-fusion.org/base/v0.1/machine_state", v="0")
-                                    continue
-
-                            param_count += 1
-                        
-                            sendOispData(n=oisp_n, v=mqtt_value)
-                            
-
-                        
+    def on_disconnect(self, client, userdata, rc):
+        logger.warning('Disconnected from the broker (result code %s); reconnecting', rc)
+        self.unreachable()
 
 
-# Callback method for successful connection
-def on_connect(client, userdata, flags, rc):
-    print("Connected with result code "+str(rc))
-    # Subscribing in on_connect() means that if we lose the connection and
-    # reconnect then subscriptions will be renewed.
-    for item in target_configs['fusionmqttdataservice']['specification']:
-        client.subscribe(item['topic'])
+def load_config(path):
+    with open(path) as f:
+        service_config = yaml.safe_load(f)['fusionmqttdataservice']
+    return service_config['specification'], Transformer(service_config.get('transforms'))
 
 
-# The callback for when a PUBLISH message is received from the server.
-def on_message(client, userdata, msg):
-    print(msg.payload.decode())
-    parse_mqtt_forward(msg.topic, msg.payload.decode('utf-8'))
+def main():
+    logging.basicConfig(level=os.environ.get('LOG_LEVEL', 'INFO').upper(),
+                        format='%(asctime)s %(levelname)s %(name)s: %(message)s')
 
-# Callback method for disconnection
-def on_disconnect(client, userdata, rc):
-    if rc != 0:
-        print("Unexpected disconnection with result code "+str(rc))
-        print("Attempting to reconnect...")
-        sendOispData(n="https://industry-fusion.org/base/v0.1/machine_state", v="0")
-    else:
-        print("Disconnected successfully")
-        sendOispData(n="https://industry-fusion.org/base/v0.1/machine_state", v="0")
+    url = os.environ.get('PROTOCOL_URL', '')
+    broker = urlparse(url if '//' in url else 'mqtt://' + url)
+    agent = AgentSender(os.environ.get('IFF_AGENT_URL', '127.0.0.1'), int(os.environ.get('IFF_AGENT_UDP_PORT', '41234')))
+    specification, transformer = load_config(os.environ.get('CONFIG_PATH', '../resources/config.yaml'))
+    service = Service(specification, transformer, agent)
+    logger.info('Listening to %d topic(s) on %s:%s', len(specification), broker.hostname, broker.port or 1883)
 
-if __name__ == "__main__":
+    # Time for the IFF agent in the same pod to come up before the first send
+    time.sleep(float(os.environ.get('STARTUP_DELAY', '45')))
 
     client = mqtt.Client()
-
-    time.sleep(20)
-
-    # Callback method initialization
-    client.on_connect = on_connect
-    client.on_message = on_message
-    client.on_disconnect = on_disconnect
-
-    client.connect(str(broker_url), int(broker_port), 60)
-
+    client.on_connect = service.on_connect
+    client.on_message = service.on_message
+    client.on_disconnect = service.on_disconnect
+    while True:
+        try:
+            client.connect(str(broker.hostname), int(broker.port or 1883), 60)
+            break
+        except OSError as e:
+            logger.warning('Could not reach the broker: %s. Retrying in 5 seconds...', e)
+            service.unreachable()
+            time.sleep(5)
+    # Reconnects by itself after a lost connection
     client.loop_forever()
+
+
+if __name__ == '__main__':
+    main()
