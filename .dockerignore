@@ -1,3 +1,12 @@
 env
 README.md
 resources
+.git
+.github
+.gitignore
+tests
+__pycache__
+*.pyc
+.pytest_cache
+.venv
+venv
